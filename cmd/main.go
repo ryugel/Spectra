@@ -1,21 +1,20 @@
 package main
 
 import (
-    "log"
-    "net/http"
+	"log"
+	"net/http"
+	"spectra/internal/router"
+	"spectra/internal/utils"
 )
 
-func WelcomeHandler(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Content-Type", "text/plain")
-    _, err := w.Write([]byte("Welcome to Spectra API"))
-    if err != nil {
-        http.Error(w, "Unable to write response", http.StatusInternalServerError)
-    }
-}
-
 func main() {
-    http.HandleFunc("/", WelcomeHandler)
+	utils.LoadEnv()
 
-    log.Println("Server started at :8080")
-    log.Fatal(http.ListenAndServe(":8080", nil))
+	mux := router.NewRouter()
+
+	serverAddr := ":8080"
+	log.Printf("Server started at %s", serverAddr)
+	if err := http.ListenAndServe(serverAddr, mux); err != nil {
+		log.Fatalf("Server failed: %v", err)
+	}
 }
