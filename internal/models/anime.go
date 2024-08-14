@@ -1,23 +1,37 @@
 package models
 
 type AnimeRelease struct {
-	Title   string `json:"title"`
-	Link    string `json:"link"`
-	Episode string `json:"episode"`
-	Image   string `json:"image"`
+	Title   string
+	Link    string
+	Episode string
+	Image   string
 }
 
 type AnimeInfo struct {
-	Title       string    `json:"title"`
-	Image       string    `json:"image"`
-	Description string    `json:"description"`
-	Genres      []string  `json:"genres"`
-	ReleaseDate string    `json:"release_date"`
-	Status      string    `json:"status"`
-	Episodes    []Episode `json:"episodes"`
+	Title       string
+	Image       string
+	Description string
+	Genres      []string
+	ReleaseDate string
+	Status      string
+	Episodes    []Episode
 }
 
 type Episode struct {
-	Number string `json:"number"`
-	Url    string `json:"url"`
+	Number string
+	Url    string
+}
+
+type Movie struct {
+	Title       string
+	Link        string
+	Image       string
+	ReleaseDate string
+}
+
+type Anime struct {
+	Title       string
+	Link        string
+	Image       string
+	ReleaseDate string
 }

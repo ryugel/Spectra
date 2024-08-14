@@ -10,6 +10,9 @@ func NewRouter() *http.ServeMux {
 	mux.HandleFunc("/", WelcomeHandler)
 	mux.HandleFunc("/api/releases", handlers.GetReleasesHandler)
 	mux.HandleFunc("/api/anime", handlers.GetAnimeInfoHandler)
+	mux.HandleFunc("/api/movies", handlers.GetMoviesHandler)
+	mux.HandleFunc("/api/search", handlers.SearchQueriesHandler)
+	mux.HandleFunc("/api/popular", handlers.GetPopularAnimeHandler)
 	return mux
 }
 

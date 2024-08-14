@@ -3,6 +3,7 @@ package scraper
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -112,4 +113,98 @@ func FetchAnimeInfo(title string) (*models.AnimeInfo, error) {
 	}
 
 	return &animeInfo, nil
+}
+
+func FetchMovies() ([]models.Movie, error) {
+	var movies []models.Movie
+
+	c := colly.NewCollector()
+
+	baseURL := utils.GetEnv("BASE_URL", "")
+
+	c.OnHTML(".last_episodes .items li", func(e *colly.HTMLElement) {
+		title := e.ChildAttr("p.name a", "title")
+		link := baseURL + e.ChildAttr("a", "href")
+		image := e.ChildAttr("img", "src")
+		releaseDate := e.ChildText("p.released")
+
+		movies = append(movies, models.Movie{
+			Title:       title,
+			Link:        link,
+			Image:       image,
+			ReleaseDate: releaseDate,
+		})
+	})
+
+	err := c.Visit(baseURL + "/anime-movies.html")
+	if err != nil {
+		return nil, err
+	}
+
+	return movies, nil
+}
+
+func SearchQuery(keyword string, genres []string) ([]models.Movie, error) {
+	var movies []models.Movie
+
+	c := colly.NewCollector()
+
+	baseURL := utils.GetEnv("BASE_URL", "https://anitaku.pe")
+
+	searchURL := baseURL + "/filter.html?keyword=" + url.QueryEscape(keyword)
+
+	if len(genres) > 0 {
+		searchURL += "&genre[]=" + strings.Join(genres, "&genre[]=")
+	}
+
+	c.OnHTML(".last_episodes .items li", func(e *colly.HTMLElement) {
+		title := e.ChildAttr("p.name a", "title")
+		link := baseURL + e.ChildAttr("a", "href")
+		image := e.ChildAttr("img", "src")
+		releaseDate := e.ChildText("p.released")
+
+		movies = append(movies, models.Movie{
+			Title:       title,
+			Link:        link,
+			Image:       image,
+			ReleaseDate: releaseDate,
+		})
+	})
+
+	err := c.Visit(searchURL)
+	if err != nil {
+		return nil, err
+	}
+
+	return movies, nil
+}
+
+func FetchPopularAnime() ([]models.Anime, error) {
+	baseURL := utils.GetEnv("BASE_URL", "")
+	popularPageURL := baseURL + "/popular.html"
+
+	var popularAnime []models.Anime
+
+	c := colly.NewCollector()
+
+	c.OnHTML(".last_episodes .items li", func(e *colly.HTMLElement) {
+		title := e.ChildAttr("p.name a", "title")
+		link := baseURL + e.ChildAttr("a", "href")
+		image := e.ChildAttr("img", "src")
+		releaseDate := e.ChildText("p.released")
+
+		popularAnime = append(popularAnime, models.Anime{
+			Title:       title,
+			Link:        link,
+			Image:       image,
+			ReleaseDate: releaseDate,
+		})
+	})
+
+	err := c.Visit(popularPageURL)
+	if err != nil {
+		return nil, err
+	}
+
+	return popularAnime, nil
 }
