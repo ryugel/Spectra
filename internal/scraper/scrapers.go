@@ -14,8 +14,8 @@ import (
 )
 
 func FetchReleases() ([]models.AnimeRelease, error) {
-	baseURL := utils.GetEnv("BASE_URL", "")
-	homePageURL := utils.GetEnv("HOME_PAGE_URL", "")
+	baseURL := utils.GetEnv("BASE_URL", "https://anitaku.pe")
+	homePageURL := utils.GetEnv("HOME_PAGE_URL", "https://anitaku.pe/home.html")
 
 	var releases []models.AnimeRelease
 
@@ -45,7 +45,7 @@ func FetchReleases() ([]models.AnimeRelease, error) {
 
 func FetchAnimeInfo(title string) (*models.AnimeInfo, error) {
 	slug := strings.ReplaceAll(title, " ", "-")
-	baseURL := utils.GetEnv("BASE_URL", "")
+	baseURL := utils.GetEnv("BASE_URL", "https://anitaku.pe")
 	url := baseURL + "/category/" + slug
 
 	c := colly.NewCollector()
@@ -120,7 +120,7 @@ func FetchMovies() ([]models.Movie, error) {
 
 	c := colly.NewCollector()
 
-	baseURL := utils.GetEnv("BASE_URL", "")
+	baseURL := utils.GetEnv("BASE_URL", "https://anitaku.pe")
 
 	c.OnHTML(".last_episodes .items li", func(e *colly.HTMLElement) {
 		title := e.ChildAttr("p.name a", "title")
@@ -180,7 +180,7 @@ func SearchQuery(keyword string, genres []string) ([]models.Movie, error) {
 }
 
 func FetchPopularAnime() ([]models.Anime, error) {
-	baseURL := utils.GetEnv("BASE_URL", "")
+	baseURL := utils.GetEnv("BASE_URL", "https://anitaku.pe")
 	popularPageURL := baseURL + "/popular.html"
 
 	var popularAnime []models.Anime
@@ -207,4 +207,25 @@ func FetchPopularAnime() ([]models.Anime, error) {
 	}
 
 	return popularAnime, nil
+}
+
+func FetchEpisodeVideoURL(episodeURL string) (string, error) {
+	var videoURL string
+
+	c := colly.NewCollector()
+
+	c.OnHTML("div.play-video iframe", func(e *colly.HTMLElement) {
+		videoURL = e.Attr("src")
+	})
+
+	err := c.Visit(episodeURL)
+	if err != nil {
+		return "", err
+	}
+
+	if videoURL == "" {
+		return "", errors.New("video URL not found")
+	}
+
+	return videoURL, nil
 }

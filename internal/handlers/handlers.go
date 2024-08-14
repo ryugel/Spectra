@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"spectra/internal/scraper"
+	"strings"
 )
 
 func GetReleasesHandler(w http.ResponseWriter, r *http.Request) {
@@ -80,4 +81,30 @@ func GetPopularAnimeHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(popularAnime); err != nil {
 		http.Error(w, "Failed to encode popular anime", http.StatusInternalServerError)
 	}
+}
+func GetEpisodeVideoURLHandler(w http.ResponseWriter, r *http.Request) {
+	episodeURL := r.URL.Query().Get("episode_url")
+	if episodeURL == "" {
+		http.Error(w, "Missing episode_url parameter", http.StatusBadRequest)
+		return
+	}
+
+	videoURL, err := scraper.FetchEpisodeVideoURL(episodeURL)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]string{"video_url": videoURL}
+
+	jsonData, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, "Failed to encode video URL", http.StatusInternalServerError)
+		return
+	}
+
+	jsonString := strings.ReplaceAll(string(jsonData), `\u0026`, "&")
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(jsonString))
 }
