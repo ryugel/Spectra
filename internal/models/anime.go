@@ -27,6 +27,7 @@ type Movie struct {
 	Link        string
 	Image       string
 	ReleaseDate string
+	IsSubbed    string
 }
 
 type Anime struct {
