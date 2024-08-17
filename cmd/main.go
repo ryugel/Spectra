@@ -4,11 +4,9 @@ import (
 	"log"
 	"net/http"
 	"spectra/internal/router"
-	"spectra/internal/utils"
 )
 
 func main() {
-	utils.LoadEnv()
 
 	mux := router.NewRouter()
 

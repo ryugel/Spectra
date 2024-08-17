@@ -127,12 +127,17 @@ func FetchMovies() ([]models.Movie, error) {
 		link := baseURL + e.ChildAttr("a", "href")
 		image := e.ChildAttr("img", "src")
 		releaseDate := e.ChildText("p.released")
+		isSubbed := "Sub"
+		if strings.Contains(title, "Dub") {
+			isSubbed = "Dub"
+		}
 
 		movies = append(movies, models.Movie{
 			Title:       title,
 			Link:        link,
 			Image:       image,
 			ReleaseDate: releaseDate,
+			IsSubbed:    isSubbed,
 		})
 	})
 
