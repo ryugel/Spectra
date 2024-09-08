@@ -11,50 +11,48 @@ import (
 	"spectra/internal/utils"
 
 	"github.com/gocolly/colly"
+	"github.com/sirupsen/logrus"
 )
+
+func ConfigureCollector() *colly.Collector {
+	c := colly.NewCollector()
+	c.OnRequest(func(r *colly.Request) {
+		logrus.Infof("Visiting: %s", r.URL.String())
+	})
+	return c
+}
 
 func FetchReleases() ([]models.AnimeRelease, error) {
 	baseURL := utils.GetEnv("BASE_URL", "https://anitaku.pe")
 	homePageURL := utils.GetEnv("HOME_PAGE_URL", "https://anitaku.pe/home.html")
 
 	var releases []models.AnimeRelease
-
-	c := colly.NewCollector()
+	c := ConfigureCollector()
 
 	c.OnHTML(".last_episodes .items li", func(e *colly.HTMLElement) {
-		title := e.ChildAttr("p.name a", "title")
-		link := baseURL + e.ChildAttr("a", "href")
-		episode := e.ChildText("p.episode")
-		image := e.ChildAttr("img", "src")
-
 		releases = append(releases, models.AnimeRelease{
-			Title:   title,
-			Link:    link,
-			Episode: episode,
-			Image:   image,
+			Title:   e.ChildAttr("p.name a", "title"),
+			Link:    baseURL + e.ChildAttr("a", "href"),
+			Episode: e.ChildText("p.episode"),
+			Image:   e.ChildAttr("img", "src"),
 		})
 	})
 
-	err := c.Visit(homePageURL)
-	if err != nil {
-		return nil, err
+	if err := c.Visit(homePageURL); err != nil {
+		return nil, fmt.Errorf("failed to fetch releases: %w", err)
 	}
 
 	return releases, nil
 }
 
-func FetchAnimeInfo(title string) (*models.AnimeInfo, error) {
-	slug := strings.ReplaceAll(title, " ", "-")
-	baseURL := utils.GetEnv("BASE_URL", "https://anitaku.pe")
-	url := baseURL + "/category/" + slug
 
-	c := colly.NewCollector()
+func FetchAnimeInfo(title string) (*models.AnimeInfo, error) {
+	baseURL := utils.GetEnv("BASE_URL", "https://anitaku.pe")
+	slug := strings.ReplaceAll(strings.ToLower(title), " ", "-")
+	animeURL := fmt.Sprintf("%s/category/%s", baseURL, slug)
 
 	var animeInfo models.AnimeInfo
-
-	c.OnRequest(func(r *colly.Request) {
-		fmt.Println("Visiting:", r.URL.String())
-	})
+	c := ConfigureCollector()
 
 	c.OnHTML("div.anime_info_body_bg", func(e *colly.HTMLElement) {
 		animeInfo.Title = e.ChildText("h1")
@@ -66,21 +64,24 @@ func FetchAnimeInfo(title string) (*models.AnimeInfo, error) {
 			animeInfo.Description = desc
 		}
 
-		if release := e.ChildText("p.type:contains('Released:')"); release != "" {
-			animeInfo.ReleaseDate = strings.TrimSpace(strings.Replace(release, "Released:", "", 1))
-		}
-
 		e.ForEach("p.type:contains('Genre:') a", func(_ int, el *colly.HTMLElement) {
 			genre := strings.TrimSpace(el.Text)
-			animeInfo.Genres = append(animeInfo.Genres, genre)
+			if genre != "" && genre != "," {
+				animeInfo.Genres = append(animeInfo.Genres, genre)
+			}
 		})
 
-		if status := e.ChildText("p.type:contains('Status:') a"); status != "" {
-			animeInfo.Status = strings.TrimSpace(status)
+		var cleanedGenres []string
+		for _, genre := range animeInfo.Genres {
+			trimmedGenre := strings.Trim(genre, ", ")
+			if trimmedGenre != "" {
+				cleanedGenres = append(cleanedGenres, trimmedGenre)
+			}
 		}
+		animeInfo.Genres = cleanedGenres
 	})
 
-	c.OnHTML("div.anime_video_body", func(e *colly.HTMLElement) {
+c.OnHTML("div.anime_video_body", func(e *colly.HTMLElement) {
 		e.ForEach("ul#episode_page li a", func(_ int, el *colly.HTMLElement) {
 			epStart, err1 := strconv.Atoi(el.Attr("ep_start"))
 			epEnd, err2 := strconv.Atoi(el.Attr("ep_end"))
@@ -101,11 +102,10 @@ func FetchAnimeInfo(title string) (*models.AnimeInfo, error) {
 				animeInfo.Episodes = append(animeInfo.Episodes, episode)
 			}
 		})
-	})
+  })
 
-	err := c.Visit(url)
-	if err != nil {
-		return nil, err
+	if err := c.Visit(animeURL); err != nil {
+		return nil, fmt.Errorf("failed to fetch anime info: %w", err)
 	}
 
 	if animeInfo.Title == "" {
@@ -116,17 +116,14 @@ func FetchAnimeInfo(title string) (*models.AnimeInfo, error) {
 }
 
 func FetchMovies() ([]models.Movie, error) {
-	var movies []models.Movie
-
-	c := colly.NewCollector()
-
 	baseURL := utils.GetEnv("BASE_URL", "https://anitaku.pe")
+	moviesPageURL := fmt.Sprintf("%s/anime-movies.html", baseURL)
+
+	var movies []models.Movie
+	c := ConfigureCollector()
 
 	c.OnHTML(".last_episodes .items li", func(e *colly.HTMLElement) {
 		title := e.ChildAttr("p.name a", "title")
-		link := baseURL + e.ChildAttr("a", "href")
-		image := e.ChildAttr("img", "src")
-		releaseDate := e.ChildText("p.released")
 		isSubbed := "Sub"
 		if strings.Contains(title, "Dub") {
 			isSubbed = "Dub"
@@ -134,39 +131,33 @@ func FetchMovies() ([]models.Movie, error) {
 
 		movies = append(movies, models.Movie{
 			Title:       title,
-			Link:        link,
-			Image:       image,
-			ReleaseDate: releaseDate,
+			Link:        baseURL + e.ChildAttr("a", "href"),
+			Image:       e.ChildAttr("img", "src"),
+			ReleaseDate: e.ChildText("p.released"),
 			IsSubbed:    isSubbed,
 		})
 	})
 
-	err := c.Visit(baseURL + "/anime-movies.html")
-	if err != nil {
-		return nil, err
+	if err := c.Visit(moviesPageURL); err != nil {
+		return nil, fmt.Errorf("failed to fetch movies: %w", err)
 	}
 
 	return movies, nil
 }
 
 func SearchQuery(keyword string, genres []string) ([]models.Movie, error) {
-	var movies []models.Movie
-
-	c := colly.NewCollector()
-
 	baseURL := utils.GetEnv("BASE_URL", "https://anitaku.pe")
-
-	searchURL := baseURL + "/filter.html?keyword=" + url.QueryEscape(keyword)
+	searchURL := fmt.Sprintf("%s/filter.html?keyword=%s", baseURL, url.QueryEscape(keyword))
 
 	if len(genres) > 0 {
 		searchURL += "&genre[]=" + strings.Join(genres, "&genre[]=")
 	}
 
+	var movies []models.Movie
+	c := ConfigureCollector()
+
 	c.OnHTML(".last_episodes .items li", func(e *colly.HTMLElement) {
 		title := e.ChildAttr("p.name a", "title")
-		link := baseURL + e.ChildAttr("a", "href")
-		image := e.ChildAttr("img", "src")
-		releaseDate := e.ChildText("p.released")
 		isSubbed := "Sub"
 		if strings.Contains(title, "Dub") {
 			isSubbed = "Dub"
@@ -174,16 +165,15 @@ func SearchQuery(keyword string, genres []string) ([]models.Movie, error) {
 
 		movies = append(movies, models.Movie{
 			Title:       title,
-			Link:        link,
-			Image:       image,
-			ReleaseDate: releaseDate,
+			Link:        baseURL + e.ChildAttr("a", "href"),
+			Image:       e.ChildAttr("img", "src"),
+			ReleaseDate: e.ChildText("p.released"),
 			IsSubbed:    isSubbed,
 		})
 	})
 
-	err := c.Visit(searchURL)
-	if err != nil {
-		return nil, err
+	if err := c.Visit(searchURL); err != nil {
+		return nil, fmt.Errorf("failed to perform search: %w", err)
 	}
 
 	return movies, nil
@@ -191,29 +181,22 @@ func SearchQuery(keyword string, genres []string) ([]models.Movie, error) {
 
 func FetchPopularAnime() ([]models.Anime, error) {
 	baseURL := utils.GetEnv("BASE_URL", "https://anitaku.pe")
-	popularPageURL := baseURL + "/popular.html"
+	popularPageURL := fmt.Sprintf("%s/popular.html", baseURL)
 
 	var popularAnime []models.Anime
-
-	c := colly.NewCollector()
+	c := ConfigureCollector()
 
 	c.OnHTML(".last_episodes .items li", func(e *colly.HTMLElement) {
-		title := e.ChildAttr("p.name a", "title")
-		link := baseURL + e.ChildAttr("a", "href")
-		image := e.ChildAttr("img", "src")
-		releaseDate := e.ChildText("p.released")
-
 		popularAnime = append(popularAnime, models.Anime{
-			Title:       title,
-			Link:        link,
-			Image:       image,
-			ReleaseDate: releaseDate,
+			Title:       e.ChildAttr("p.name a", "title"),
+			Link:        baseURL + e.ChildAttr("a", "href"),
+			Image:       e.ChildAttr("img", "src"),
+			ReleaseDate: e.ChildText("p.released"),
 		})
 	})
 
-	err := c.Visit(popularPageURL)
-	if err != nil {
-		return nil, err
+	if err := c.Visit(popularPageURL); err != nil {
+		return nil, fmt.Errorf("failed to fetch popular anime: %w", err)
 	}
 
 	return popularAnime, nil
@@ -221,16 +204,14 @@ func FetchPopularAnime() ([]models.Anime, error) {
 
 func FetchEpisodeVideoURL(episodeURL string) (string, error) {
 	var videoURL string
-
-	c := colly.NewCollector()
+	c := ConfigureCollector()
 
 	c.OnHTML("div.play-video iframe", func(e *colly.HTMLElement) {
 		videoURL = e.Attr("src")
 	})
 
-	err := c.Visit(episodeURL)
-	if err != nil {
-		return "", err
+	if err := c.Visit(episodeURL); err != nil {
+		return "", fmt.Errorf("failed to fetch video URL: %w", err)
 	}
 
 	if videoURL == "" {
@@ -239,3 +220,10 @@ func FetchEpisodeVideoURL(episodeURL string) (string, error) {
 
 	return videoURL, nil
 }
+
+
+func extractTextAfter(e *colly.HTMLElement, selector, prefix string) string {
+	text := e.ChildText(selector)
+	return strings.TrimSpace(strings.Replace(text, prefix, "", 1))
+}
+

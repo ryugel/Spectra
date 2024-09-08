@@ -12,8 +12,6 @@ type AnimeInfo struct {
 	Image       string
 	Description string
 	Genres      []string
-	ReleaseDate string
-	Status      string
 	Episodes    []Episode
 }
 
